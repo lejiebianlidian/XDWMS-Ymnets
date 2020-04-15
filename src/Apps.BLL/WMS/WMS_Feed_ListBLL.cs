@@ -126,7 +126,8 @@ namespace Apps.BLL.WMS
 								var model = new WMS_Feed_ListModel();
 								model.Id = row.Id;
 								model.FeedBillNum = row.FeedBillNum;
-								//model.ReleaseBillNum = row.ReleaseBillNum;
+                            //把系统单据号与业务单据号赋一样的值
+                                model.ReleaseBillNum = row.FeedBillNum;
 								model.Department = row.Department;
 								model.AssemblyPartCode = row.AssemblyPartCode;
 								model.SubAssemblyPartCode = row.SubAssemblyPartCode;
@@ -137,7 +138,8 @@ namespace Apps.BLL.WMS
                             model.Lot = row.Lot;
 								//model.SubInvId = row.SubInvId;
 								model.Remark = row.Remark;
-								//model.PrintStaus = row.PrintStaus;
+                            //默认已打印
+								model.PrintStaus = "已打印";
 								//model.PrintDate = row.PrintDate;
 								//model.PrintMan = row.PrintMan;
 								//model.ConfirmStatus = row.ConfirmStatus;
@@ -178,7 +180,7 @@ namespace Apps.BLL.WMS
 									WMS_Feed_List entity = new WMS_Feed_List();
 									entity.Id = model.Id;
 									entity.FeedBillNum = model.FeedBillNum;
-                            //entity.ReleaseBillNum = model.ReleaseBillNum;
+                                    entity.ReleaseBillNum = model.ReleaseBillNum;
                             //entity.ReleaseBillNum = "TL" + DateTime.Now.ToString("yyyyMMddHHmmssff");打印时生成
                             entity.Department = model.Department;
 									entity.AssemblyPartId = model.AssemblyPartId;
@@ -190,7 +192,7 @@ namespace Apps.BLL.WMS
                             entity.Lot = model.Lot;
 									//entity.SubInvId = model.SubInvId;
 									entity.Remark = model.Remark;
-									entity.PrintStaus = "未打印";
+									entity.PrintStaus = "已打印";
 									//entity.PrintDate = model.PrintDate;
 									//entity.PrintMan = model.PrintMan;
 									entity.ConfirmStatus = "未确认";
@@ -343,13 +345,34 @@ namespace Apps.BLL.WMS
 
         public List<WMS_Feed_ListModel> GetListByWhere(ref GridPager pager, string where)
 		{
-			IQueryable<WMS_Feed_List> queryData = null;
+            //string b = "x2001,N190708001,N190708002";
+            //var d = m_Rep.GetList(p => p.PrintStaus == "未打印" && b.Split(',').Contains(p.FeedBillNum));
+            //var l = d.ToList();
+
+            IQueryable<WMS_Feed_List> queryData = null;
 			queryData = m_Rep.GetList().Where(where);
 			pager.totalRows = queryData.Count();
-			//排序
-			queryData = LinqHelper.SortingAndPaging(queryData, pager.sort, pager.order, pager.page, pager.rows);
+            //排序string where
+            queryData = LinqHelper.SortingAndPaging(queryData, pager.sort, pager.order, pager.page, pager.rows);
 			return CreateModelList(ref queryData);
 		}
+
+        public List<WMS_Feed_ListModel> GetListForConfirm(ref GridPager pager, string releaseBillNums)
+        {
+            try
+            {
+                IQueryable<WMS_Feed_List> queryData = null;
+                queryData = m_Rep.GetList(p => p.PrintStaus == "已打印" && releaseBillNums.Contains(p.ReleaseBillNum));
+                pager.totalRows = queryData.Count();
+                //排序
+                queryData = LinqHelper.SortingAndPaging(queryData, pager.sort, pager.order, pager.page, pager.rows);
+                return CreateModelList(ref queryData);
+            }
+            catch(Exception ex)
+            {
+                return null;
+            }
+        }
 
         public List<WMS_Feed_ListModel> GetListByWhereAndGroupBy(ref GridPager pager, string where)
         {
@@ -362,6 +385,20 @@ namespace Apps.BLL.WMS
             //排序
             queryData = LinqHelper.SortingAndPaging(queryData, pager.sort, pager.order, pager.page, pager.rows);
             return CreateModelList(ref queryData);
+        }
+        public decimal GetSumByWhere(string where, string sumField)
+        {
+            ParameterExpression parameter = Expression.Parameter(typeof(WMS_Feed_List), "p");
+            var expression = Expression.Lambda<Func<WMS_Feed_List, decimal>>(Expression.Property(parameter, sumField), parameter);
+            try
+            {
+                decimal total = m_Rep.GetList().Where(where).Sum(expression);
+                return total;
+            }
+            catch (Exception ex)
+            {
+                return 0;
+            }
         }
 
         public string PrintFeedList(ref ValidationErrors errors, string opt, string feedBillNum, int id)
@@ -401,20 +438,23 @@ namespace Apps.BLL.WMS
             }
         }
 
-        public bool ConfirmFeedList(ref ValidationErrors errors, string opt, string releaseBillNum)
+        public bool ConfirmFeedList(ref ValidationErrors errors, string opt, string releaseBillNums)
         {
             try
             {
-                var rtn = m_Rep.ConfirmFeedList(opt, releaseBillNum);
-                if (String.IsNullOrEmpty(rtn))
+                foreach (string releaseBillNum in releaseBillNums.Split(','))
                 {
-                    return true;
+                    var rtn = m_Rep.ConfirmFeedList(opt, releaseBillNum);
+                    if (!String.IsNullOrEmpty(rtn))
+                    {
+                        errors.Add(rtn);
+                    }
                 }
-                else
-                {
-                    errors.Add(rtn);
+
+                if (errors.Count() > 0)
                     return false;
-                }
+                else
+                    return true;
             }
             catch (Exception ex)
             {

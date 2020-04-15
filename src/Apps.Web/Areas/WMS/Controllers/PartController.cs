@@ -84,9 +84,12 @@ namespace Apps.Web.Areas.WMS.Controllers
             {
                 model.BelongSupplier = ";" + model.BelongSupplier;
             }
-            model.CustomerCode = model.CustomerCode.Replace(" ", "").Replace("；", ";");
-            model.BelongCustomer = model.BelongCustomer.Replace(" ", "").Replace("；", ";");
-            model.BelongSupplier = model.BelongSupplier.Replace(" ", "").Replace("；", ";");
+            if(model.CustomerCode != null)
+                model.CustomerCode = model.CustomerCode.Replace(" ", "").Replace("；", ";");
+            if(model.BelongCustomer != null)
+                model.BelongCustomer = model.BelongCustomer.Replace(" ", "").Replace("；", ";");
+            if (model.BelongSupplier != null)
+                model.BelongSupplier = model.BelongSupplier.Replace(" ", "").Replace("；", ";");
 
             model.Id = 0;
             model.CreateTime = ResultHelper.NowTime;
@@ -184,6 +187,49 @@ namespace Apps.Web.Areas.WMS.Controllers
         }
         #endregion
 
+        #region 修改
+        [SupportFilter(ActionName = "Edit")]
+        public ActionResult UpdateStoreMan(long id)
+        {
+            WMS_PartModel entity = m_BLL.GetById(id);
+            ViewBag.EditStatus = true;
+            return View(entity);
+        }
+
+        //[HttpPost]
+        //[SupportFilter(ActionName = "Edit")]
+        //[ValidateInput(false)]
+        //public JsonResult UpdateStoreMan(WMS_PartModel model)
+        //{
+        //    if (model.Remark != null)
+        //        model.Remark = model.Remark.Replace(" ", "");
+
+
+        //    model.ModifyTime = ResultHelper.NowTime;
+        //    model.ModifyPerson = GetUserTrueName();
+
+        //    if (model != null && model.Remark != null)
+        //    {
+
+        //        if (m_BLL.UpdateStoreMan(ref errors,model.ModifyPerson, model.StoreMan,model.Remark))
+        //        {
+        //            LogHandler.WriteServiceLog(GetUserTrueName(), "Id" + model.Id + ",PartCode" + model.PartCode, "成功", "修改", "WMS_Part");
+        //            return Json(JsonHandler.CreateMessage(1, Resource.EditSucceed));
+        //        }
+        //        else
+        //        {
+        //            string ErrorCol = errors.Error;
+        //            LogHandler.WriteServiceLog(GetUserTrueName(), "Id" + model.Id + ",PartCode" + model.PartCode + "," + ErrorCol, "失败", "修改", "WMS_Part");
+        //            return Json(JsonHandler.CreateMessage(0, Resource.EditFail + ErrorCol));
+        //        }
+        //    }
+        //    else
+        //    {
+        //        return Json(JsonHandler.CreateMessage(0, Resource.EditFail));
+        //    }
+        //}
+        #endregion
+
         #region 详细
         [SupportFilter]
         public ActionResult Details(long id)
@@ -220,6 +266,33 @@ namespace Apps.Web.Areas.WMS.Controllers
         }
         #endregion
 
+        #region 修改保管员
+        [HttpPost]
+        [SupportFilter(ActionName = "Edit")]
+        [ValidateInput(false)]
+        public ActionResult UpdateStoreMan(string StoreMan, string newStoreMan)
+        {            
+            if (newStoreMan != "")
+            {
+                if (m_BLL.UpdateStoreMan(ref errors, GetUserTrueName(), StoreMan, newStoreMan))
+                {
+                    LogHandler.WriteServiceLog(GetUserTrueName(), "StoreMan:" + newStoreMan, "成功", "修改", "WMS_Part");
+                    return Json(JsonHandler.CreateMessage(1, Resource.UpdateSucceed));
+                }
+                else
+                {
+                    string ErrorCol = errors.Error;
+                    LogHandler.WriteServiceLog(GetUserTrueName(), "StoreMan" + newStoreMan + "," + ErrorCol, "失败", "修改", "WMS_Part");
+                    return Json(JsonHandler.CreateMessage(0, Resource.UpdateFail + ErrorCol));
+                }
+            }
+            else
+            {
+                return Json(JsonHandler.CreateMessage(0, Resource.EditFail));
+            }
+        }
+        #endregion
+
         #region 导出导入
         [HttpPost]
         [SupportFilter]
@@ -228,7 +301,9 @@ namespace Apps.Web.Areas.WMS.Controllers
             if (m_BLL.ImportExcelData(GetUserTrueName(), Utils.GetMapPath(filePath), ref errors))
             {
                 LogHandler.WriteImportExcelLog(GetUserTrueName(), "WMS_Part", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入成功");
-                return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, filePath));
+                return Json(JsonHandler.CreateMessage(1, 
+                    Resource.InsertSucceed + "，记录数：" + Utils.GetRowCount(Utils.GetMapPath(filePath)).ToString(),
+                    filePath));
             }
             else
             {
@@ -259,7 +334,10 @@ namespace Apps.Web.Areas.WMS.Controllers
             if (m_BLL.ImportSafeStock(GetUserTrueName(), Utils.GetMapPath(filePath), ref errors))
             {
                 LogHandler.WriteImportExcelLog(GetUserTrueName(), "WMS_Part", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入成功");
-                return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, filePath));
+                //return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, filePath));
+                return Json(JsonHandler.CreateMessage(1,
+                    Resource.InsertSucceed + "，记录数：" + Utils.GetRowCount(Utils.GetMapPath(filePath)).ToString(),
+                    filePath));
             }
             else
             {
@@ -274,7 +352,9 @@ namespace Apps.Web.Areas.WMS.Controllers
             if (m_BLL.ImportBelongSupplier(GetUserTrueName(), Utils.GetMapPath(filePath), ref errors))
             {
                 LogHandler.WriteImportExcelLog(GetUserTrueName(), "WMS_Part", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入成功");
-                return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, filePath));
+                return Json(JsonHandler.CreateMessage(1,
+                    Resource.InsertSucceed + "，记录数：" + Utils.GetRowCount(Utils.GetMapPath(filePath)).ToString(),
+                    filePath));
             }
             else
             {
@@ -290,7 +370,9 @@ namespace Apps.Web.Areas.WMS.Controllers
             if (m_BLL.ImportBelongCustomer(GetUserTrueName(), Utils.GetMapPath(filePath), ref errors))
             {
                 LogHandler.WriteImportExcelLog(GetUserTrueName(), "WMS_Part", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入成功");
-                return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, filePath));
+                return Json(JsonHandler.CreateMessage(1,
+                    Resource.InsertSucceed + "，记录数：" + Utils.GetRowCount(Utils.GetMapPath(filePath)).ToString(),
+                    filePath));
             }
             else
             {
@@ -305,7 +387,9 @@ namespace Apps.Web.Areas.WMS.Controllers
             if (m_BLL.ImportVolume(GetUserTrueName(), Utils.GetMapPath(filePath), ref errors))
             {
                 LogHandler.WriteImportExcelLog(GetUserTrueName(), "WMS_Part", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入成功");
-                return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, filePath));
+                return Json(JsonHandler.CreateMessage(1,
+                    Resource.InsertSucceed + "，记录数：" + Utils.GetRowCount(Utils.GetMapPath(filePath)).ToString(),
+                    filePath));
             }
             else
             {
@@ -313,6 +397,25 @@ namespace Apps.Web.Areas.WMS.Controllers
                 return Json(JsonHandler.CreateMessage(0, Resource.InsertFail, filePath));
             }
         }
+
+        [HttpPost]
+        [SupportFilter(ActionName = "Import")]
+        public ActionResult StoreManImport(string filePath)
+        {
+            if (m_BLL.ImportStoreMan(GetUserTrueName(), Utils.GetMapPath(filePath), ref errors))
+            {
+                LogHandler.WriteImportExcelLog(GetUserTrueName(), "WMS_Part", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入成功");
+                return Json(JsonHandler.CreateMessage(1,
+                    Resource.InsertSucceed + "，记录数：" + Utils.GetRowCount(Utils.GetMapPath(filePath)).ToString(),
+                    filePath));
+            }
+            else
+            {
+                LogHandler.WriteImportExcelLog(GetUserTrueName(), "WMS_Part", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入失败");
+                return Json(JsonHandler.CreateMessage(0, Resource.InsertFail, filePath));
+            }
+        }
+
         [HttpPost]
         [SupportFilter(ActionName = "Export")]
         public JsonResult CheckExportData(string queryStr)
@@ -471,7 +574,7 @@ namespace Apps.Web.Areas.WMS.Controllers
         {
             JArray jObjects = new JArray();
             var jo = new JObject();
-            jo.Add("物料编码(必输)", "");
+            jo.Add("主机厂编码(必输)", "");
             jo.Add("每箱体积(必输)", "");
             jo.Add("导入的错误信息", "");
             jObjects.Add(jo);
@@ -485,6 +588,26 @@ namespace Apps.Web.Areas.WMS.Controllers
                 ExportData = dt
             };
         }
+        [SupportFilter(ActionName = "Export")]
+        public ActionResult ExportStoreManTemplate()
+        {
+            JArray jObjects = new JArray();
+            var jo = new JObject();
+            jo.Add("物料编码(必输)", "");
+            jo.Add("保管员(必输)", "");
+            jo.Add("导入的错误信息", "");
+            jObjects.Add(jo);
+            var dt = JsonConvert.DeserializeObject<DataTable>(jObjects.ToString());
+            var exportFileName = string.Concat("保管员导入模板",
+                    ".xlsx");
+            return new ExportExcelResult
+            {
+                SheetName = "Sheet1",
+                FileName = exportFileName,
+                ExportData = dt
+            };
+        }
+
         #endregion
 
         #region 选择物料

@@ -51,7 +51,7 @@
     @Html.ToolButton("btnDelete", "fa fa-trash", Resource.Delete, ref perm, "Delete", true)
     @Html.ToolButton("btnImport", "fa fa-level-down", Resource.Import, ref perm, "Import", true)
     @Html.ToolButton("btnExport", "fa fa-level-up", Resource.Export, ref perm, "Export", true)
-    @Html.ToolButton("btnExportTemplate", "fa fa-level-up", Resource.ExportTemplate, ref perm, "Export", true)
+    @*@Html.ToolButton("btnExportTemplate", "fa fa-level-up", Resource.ExportTemplate, ref perm, "Export", true)*@
     @Html.ToolButton("btnReport", "fa fa-search", "查看单据", ref perm, "Query", true)
 </div>
 <table id="List"></table>
@@ -76,6 +76,9 @@
             singleSelect: true,//单选模式
             //rownumbers: true,//行号
             onLoadSuccess: function(data) {                @foreach(var r in perm){ if (r.Category == 2) { @Html.Raw("$(this).datagrid('hideColumn','" + r.KeyCode + "'); "); } }
+            },
+            queryParams: {
+                beginDate: $("#beginDate").val(), endDate: $("#endDate").val()
             },
             columns: [[
                 { field: 'Id', title: 'Id', width: 80,hidden:true },

@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System;
 using System.Data;
+using System.Configuration;
 
 namespace Apps.Web.Areas.WMS.Controllers
 {
@@ -149,6 +150,7 @@ namespace Apps.Web.Areas.WMS.Controllers
         [SupportFilter(ActionName = "Create")]
         public ActionResult CreateParentForDataGrid()
         {
+            ViewBag.DefualtInvId = Int32.Parse(ConfigurationManager.AppSettings["DefaultInvId"]);
             return View();
         }
 
@@ -371,7 +373,9 @@ namespace Apps.Web.Areas.WMS.Controllers
             if (m_ReturnOrderBLL.ImportExcelData(GetUserId(), Utils.GetMapPath(filePath), ref errors))
             {
                  LogHandler.WriteImportExcelLog(GetUserId(), "WMS_ReturnOrder", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入成功");
-                 return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, filePath));
+                return Json(JsonHandler.CreateMessage(1,
+                   Resource.InsertSucceed + "，记录数：" + Utils.GetRowCount(Utils.GetMapPath(filePath)).ToString(),
+                   filePath));
             }
             else
             {
@@ -519,7 +523,7 @@ namespace Apps.Web.Areas.WMS.Controllers
             }
             //List<WMS_ReturnOrderModel> list = m_ReturnOrderBLL.GetListByWhere(ref pager, "SupplierId == \"" + supplierId + "\" && Abs(AdjustQty) < Abs(ReturnQty)").ToList();
             List<WMS_ReturnOrderModel> list = m_ReturnOrderBLL.GetListByWhere(ref setNoPagerAscById, "Status != \"无效\"")
-                .Where(p => p.SupplierId.ToString() == supplierId && Math.Abs(p.AdjustQty) < Math.Abs(p.ReturnQty))
+                .Where(p => p.SupplierId.ToString() == supplierId && (Math.Abs(p.AdjustQty) + Math.Abs(p.LossQty)) < Math.Abs(p.ReturnQty))
                 .ToList();
             GridRows<WMS_ReturnOrderModel> grs = new GridRows<WMS_ReturnOrderModel>();
             grs.rows = list;
@@ -537,9 +541,9 @@ namespace Apps.Web.Areas.WMS.Controllers
 
         [HttpPost]
         [SupportFilter(ActionName = "Edit")]
-        public JsonResult RetunOrderForPrintedGetList(GridPager pager)
+        public JsonResult RetunOrderForPrintedGetList(GridPager pager,string supplierCode,string supplierShortName)
         {
-            List<WMS_ReturnOrder_DModel> list = m_BLL.GetListByWhereAndGroupBy(ref pager, "PrintStaus == \"已退货\" && ConfirmStatus == \"未确认\"");
+            List<WMS_ReturnOrder_DModel> list = m_BLL.GetListByWhereAndGroupBy(ref pager, "WMS_ReturnOrder.WMS_Supplier.SupplierCode.Contains(\"" + supplierCode + "\") && WMS_ReturnOrder.WMS_Supplier.SupplierShortName.Contains(\"" + supplierShortName + "\") && PrintStaus == \"已退货\" && ConfirmStatus == \"未确认\"");
             GridRows<WMS_ReturnOrder_DModel> grs = new GridRows<WMS_ReturnOrder_DModel>();
             grs.rows = list;
             grs.total = pager.totalRows;

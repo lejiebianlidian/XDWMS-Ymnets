@@ -8,6 +8,7 @@
     Layout = "~/Views/Shared/_Index_Layout.cshtml";
     List<permModel> perm = null;
 }
+<script src="~/Scripts/My97DatePicker/WdatePicker.js"></script>
 <div id = "uploadExcel" class="easyui-window" data-options="modal:true,closed:true,minimizable:false,shadow:false">
 <form name = "form1" method="post" id="form1">
     <table>
@@ -78,6 +79,9 @@
             showFooter: true,
             //rownumbers: true,//行号
             onLoadSuccess: function(data) {                @foreach(var r in perm){ if (r.Category == 2) { @Html.Raw("$(this).datagrid('hideColumn','" + r.KeyCode + "'); "); } }
+            },
+            queryParams: {
+                beginDate: $("#beginDate").val(), endDate: $("#endDate").val()
             },
             columns: [[
                 { field: 'Id', title: 'Id', width: 80,hidden:true },

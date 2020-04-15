@@ -84,7 +84,7 @@ namespace Apps.BLL.WMS
 					//对应列头
 					excelFile.AddMapping<WMS_Sale_OrderModel>(x => x.SaleBillNum, "销售单号（业务）(必输)");
 					//excelFile.AddMapping<WMS_Sale_OrderModel>(x => x.SellBillNum, "销售单号（系统）");
-					excelFile.AddMapping<WMS_Sale_OrderModel>(x => x.PlanDeliveryDate, "计划发货日期");
+					excelFile.AddMapping<WMS_Sale_OrderModel>(x => x.PlanDeliveryDate, "要求到货日期");
 					excelFile.AddMapping<WMS_Sale_OrderModel>(x => x.CustomerShortName, "客户名称(必输)");
 					excelFile.AddMapping<WMS_Sale_OrderModel>(x => x.PartCode, "物料编码(必输)");
 					excelFile.AddMapping<WMS_Sale_OrderModel>(x => x.Qty, "数量(必输)");
@@ -388,7 +388,20 @@ namespace Apps.BLL.WMS
                 return null;
             }
         }
-
+        public decimal GetSumByWhere(string where, string sumField)
+        {
+            ParameterExpression parameter = Expression.Parameter(typeof(WMS_Sale_Order), "p");
+            var expression = Expression.Lambda<Func<WMS_Sale_Order, decimal>>(Expression.Property(parameter, sumField), parameter);
+            try
+            {
+                decimal total = m_Rep.GetList().Where(where).Sum(expression);
+                return total;
+            }
+            catch (Exception ex)
+            {
+                return 0;
+            }
+        }
         public bool UnPrintSaleOrder(ref ValidationErrors errors, string opt, string sellBillNum, int id)
         {
             try

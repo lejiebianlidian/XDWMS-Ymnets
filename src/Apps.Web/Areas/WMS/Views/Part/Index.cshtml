@@ -50,10 +50,13 @@
     @Html.ToolButton("btnBelongCustomerImport", "fa fa-level-down", "所属客户导入", ref perm, "Import", true)
     @Html.ToolButton("btnBelongSupplierImport", "fa fa-level-down", "所属供应商导入", ref perm, "Import", true)
     @Html.ToolButton("btnVolumeImport", "fa fa-level-down", "每箱体积导入", ref perm, "Import", true)
+    @Html.ToolButton("btnStoreManImport", "fa fa-level-down", "保管员导入", ref perm, "Import", true)
     @Html.ToolButton("btnSafeExportTemplate", "fa fa-level-up", "安全库存模板导出", ref perm, "Export", true)
     @Html.ToolButton("btnBelongCustomerExportTemplate", "fa fa-level-up", "所属客户模板导出", ref perm, "Export", true)
     @Html.ToolButton("btnBelongSupplierExportTemplate", "fa fa-level-up", "所属供应商模板导出", ref perm, "Export", true)
     @Html.ToolButton("btnVolumeExportTemplate", "fa fa-level-up", "每箱体积模板导出", ref perm, "Export", true)
+    @Html.ToolButton("btnStoreManExportTemplate", "fa fa-level-up", "保管员模板导出", ref perm, "Export", true)
+    @Html.ToolButton("btnUpdateStoreMan", "fa fa-pencil", "保管员批量修改", ref perm, "Edit", true)
 </div>
 <table id="List"></table>
 @Html.Partial("~/Views/Shared/_Partial_AutoGrid.cshtml")
@@ -124,6 +127,12 @@
                 $.modalWindow(Lang.Edit, '@Url.Action("Edit")?id=' + row.Id + '&Ieguid=' + GetGuid(), 400, 440, 'fa fa-pencil');
             } else { $.messageBox5s(Lang.Tip, '@Resource.PlaseChooseToOperatingRecords'); }
         });
+        $("#btnUpdateStoreMan").click(function () {
+            var row = $('#List').datagrid('getSelected');
+            if (row != null) {
+                $.modalWindow(Lang.Edit, '@Url.Action("UpdateStoreMan")?id=' + row.Id + '&Ieguid=' + GetGuid(), 400, 140, 'fa fa-pencil');
+            } else { $.messageBox5s(Lang.Tip, '@Resource.PlaseChooseToOperatingRecords'); }
+        });
         $("#btnDetails").click(function () {
             var row = $('#List').datagrid('getSelected');
             if (row != null) {
@@ -176,6 +185,11 @@
             $("#Para").val("4")
             $("#uploadExcel").window({ title: '@Resource.Import', width: 450, height: 210, iconCls: 'fa fa-level-down' }).window('open');
         });
+        $("#btnStoreManImport").click(function() {
+            $("#txtExcelPath").val("")
+            $("#Para").val("5")
+            $("#uploadExcel").window({ title: '@Resource.Import', width: 450, height: 210, iconCls: 'fa fa-level-down' }).window('open');
+        });
         $("#btnExport").click(function() {
             var queryStr = $("#txtQuery").val();
             if (queryStr == null) {
@@ -207,6 +221,9 @@
         $("#btnVolumeExportTemplate").click(function() {
           window.location = "@Url.Action("ExportVolumeTemplate")";
         });
+        $("#btnStoreManExportTemplate").click(function() {
+          window.location = "@Url.Action("ExportStoreManTemplate")";
+        });
     });
     function ImportData()
     {
@@ -227,15 +244,18 @@
         if (para == 4) {
             var url = "@Url.Action("VolumeImport")?filePath="+$("#txtExcelPath").val();
         }
+        if (para == 5) {
+            var url = "@Url.Action("StoreManImport")?filePath="+$("#txtExcelPath").val();
+        }
         @*else {
             var url = "@Url.Action("SafeStockImport")?filePath="+$("#txtExcelPath").val();
         }*@
-                $.post(url, function(data) {
+        $.post(url, function(data) {
             if (data.type == 1)
             {
-             $("#List").datagrid('load');
-             $('#uploadExcel').window('close');
-             $('#FileUpload').val('');
+                $("#List").datagrid('load');
+                $('#uploadExcel').window('close');
+                $('#FileUpload').val('');
             }
             hideLoading();
             $.messageBox5s('提示', data.message);

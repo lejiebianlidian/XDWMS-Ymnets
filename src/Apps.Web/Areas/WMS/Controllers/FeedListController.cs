@@ -33,7 +33,7 @@ namespace Apps.Web.Areas.WMS.Controllers
             //定义打印状态下拉框的值
             List<ReportType> PrintTypes = new List<ReportType>();
             PrintTypes.Add(new ReportType() { Type = 0, Name = "" });
-            PrintTypes.Add(new ReportType() { Type = 1, Name = "未打印" });
+            //PrintTypes.Add(new ReportType() { Type = 1, Name = "未打印" });
             PrintTypes.Add(new ReportType() { Type = 2, Name = "已打印" });
             PrintTypes.Add(new ReportType() { Type = 2, Name = "已失效" });
             ViewBag.PrintStaus = new SelectList(PrintTypes, "Name", "Name");
@@ -54,10 +54,7 @@ namespace Apps.Web.Areas.WMS.Controllers
         {
             //List<WMS_Feed_ListModel> list = m_BLL.GetList(ref pager, queryStr);
             string query = " 1=1 ";
-            if (printStaus == "已打印")
-            {
-               query += " && PrintDate>=(\"" + beginDate + "\")&& PrintDate<=(\"" + endDate + "\")";
-            }
+            query += " && CreateTime>=(\"" + beginDate + "\")&& CreateTime<=(\"" + endDate + "\")";
             //query += " && FeedBillNum.Contains(\"" + feedBillNum + "\")&&WMS_Part.PartCode.Contains(\"" + assemblyPartCode + "\")";
             query += " && FeedBillNum.Contains(\"" + feedBillNum + "\")";
             query += " && WMS_Part.PartCode.Contains(\"" + subAssemblyPartCode + "\")&& PrintStaus.Contains(\"" + printStaus + "\")&& ConfirmStatus.Contains(\"" + confirmStatus + "\")";
@@ -69,11 +66,15 @@ namespace Apps.Web.Areas.WMS.Controllers
             List<WMS_Feed_ListModel> list = m_BLL.GetListByWhere(ref pager, query);
             GridRows<WMS_Feed_ListModel> grs = new GridRows<WMS_Feed_ListModel>();
 
+            decimal FeedQty_All = m_BLL.GetSumByWhere(query, "FeedQty");
+
             List<WMS_Feed_ListModel> footerList = new List<WMS_Feed_ListModel>();
             footerList.Add(new WMS_Feed_ListModel()
             {
                 FeedBillNum = "<div style='text-align:right;color:#444'>合计：</div>",
-                FeedQty = list.Sum(p => p.FeedQty),
+                //FeedQty = list.Sum(p => p.FeedQty),
+                FeedQty = FeedQty_All,
+
             });
 
             grs.rows = list;
@@ -101,9 +102,10 @@ namespace Apps.Web.Areas.WMS.Controllers
         public JsonResult Create(WMS_Feed_ListModel model)
         {
             model.Id = 0;
+            model.ReleaseBillNum = model.FeedBillNum;
             model.CreatePerson = GetUserTrueName();
             model.CreateTime = ResultHelper.NowTime;
-            model.PrintStaus = "未打印";
+            model.PrintStaus = "已打印";
             model.ConfirmStatus = "未确认";
             if (model.Lot == "[空]")
                 model.Lot = "";
@@ -206,25 +208,25 @@ namespace Apps.Web.Areas.WMS.Controllers
         [HttpPost]
         [SupportFilter(ActionName = "Edit")]
         [ValidateInput(false)]
-        public JsonResult Confirm(string releaseBillNum)
+        public JsonResult Confirm(string releaseBillNums)
         {
             try
             {
-                if (m_BLL.ConfirmFeedList(ref errors, GetUserTrueName(), releaseBillNum))
+                if (m_BLL.ConfirmFeedList(ref errors, GetUserTrueName(), releaseBillNums))
                 {
-                    LogHandler.WriteServiceLog(GetUserTrueName(), "ReleaseBillNum" + releaseBillNum, "成功", "确认", "WMS_Feed_List");
-                    return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, releaseBillNum));
+                    LogHandler.WriteServiceLog(GetUserTrueName(), "ReleaseBillNums" + releaseBillNums, "成功", "确认", "WMS_Feed_List");
+                    return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, releaseBillNums));
                 }
                 else
                 {
-                    LogHandler.WriteServiceLog(GetUserTrueName(), "ReleaseBillNum" + releaseBillNum + ", " + errors.Error, "失败", "确认", "WMS_Feed_List");
+                    LogHandler.WriteServiceLog(GetUserTrueName(), "ReleaseBillNums" + releaseBillNums + ", " + errors.Error, "失败", "确认", "WMS_Feed_List");
                     return Json(JsonHandler.CreateMessage(0, Resource.InsertFail + errors.Error));
                 }
 
             }
             catch (Exception ex)
             {
-                LogHandler.WriteServiceLog(GetUserTrueName(), "ReturnOrderNum" + releaseBillNum + ", " + ex.Message, "失败", "确认", "WMS_Feed_List");
+                LogHandler.WriteServiceLog(GetUserTrueName(), "ReturnOrderNums" + releaseBillNums + ", " + ex.Message, "失败", "确认", "WMS_Feed_List");
                 return Json(JsonHandler.CreateMessage(0, Resource.InsertFail + ex.Message));
             }
         }
@@ -236,8 +238,8 @@ namespace Apps.Web.Areas.WMS.Controllers
         {
             ViewBag.Inv = new SelectList(_InvInfoBll.GetList(ref setNoPagerAscById, ""), "Id", "InvName");
             WMS_Feed_ListModel entity = m_BLL.GetById(id);
-            WMS_PartModel entity_p = m_PartBLL.GetById(entity.AssemblyPartId);
-            entity.AssemblyPartCode = entity_p.PartCode;
+            //WMS_PartModel entity_p = m_PartBLL.GetById(entity.AssemblyPartId);
+            //entity.AssemblyPartCode = entity_p.PartCode;
             WMS_PartModel entity_p1 = m_PartBLL.GetById(entity.SubAssemblyPartId);
             entity.SubAssemblyPartCode = entity_p1.PartCode;
 
@@ -359,7 +361,9 @@ namespace Apps.Web.Areas.WMS.Controllers
             if (m_BLL.ImportExcelData(GetUserTrueName(), Utils.GetMapPath(filePath), ref errors))
             {
                  LogHandler.WriteImportExcelLog(GetUserTrueName(), "WMS_Feed_List", filePath.Substring(filePath.LastIndexOf('/') + 1), filePath, "导入成功");
-                 return Json(JsonHandler.CreateMessage(1, Resource.InsertSucceed, filePath));
+                 return Json(JsonHandler.CreateMessage(1,
+                   Resource.InsertSucceed + "，记录数：" + Utils.GetRowCount(Utils.GetMapPath(filePath)).ToString(),
+                   filePath));
             }
             else
             {
@@ -384,19 +388,15 @@ namespace Apps.Web.Areas.WMS.Controllers
         [SupportFilter]
         public ActionResult Export(string feedBillNum, string assemblyPartCode, string subAssemblyPartCode, string printStaus, string confirmStatus, DateTime beginDate, DateTime endDate)
         {
-            //List<WMS_Feed_ListModel> list = m_BLL.GetList(ref setNoPagerAscById, queryStr);
             string query = " 1=1 ";
             if (printStaus == "已打印")
             {
                 query += " && PrintDate>=(\"" + beginDate + "\")&& PrintDate<=(\"" + endDate + "\")";
             }
-            query += " && FeedBillNum.Contains(\"" + feedBillNum + "\")&&WMS_Part.PartCode.Contains(\"" + assemblyPartCode + "\")";
-            query += " && WMS_Part1.PartCode.Contains(\"" + subAssemblyPartCode + "\")&& PrintStaus.Contains(\"" + printStaus + "\")&& ConfirmStatus.Contains(\"" + confirmStatus + "\")";
-
-            //List<WMS_Feed_ListModel> list = m_BLL.GetListByWhere(ref pager, "FeedBillNum.Contains(\"" + feedBillNum + "\")&&WMS_Part.PartCode.Contains(\"" + assemblyPartCode + "\") && WMS_Part1.PartCode.Contains(\""
-            //  + subAssemblyPartCode + "\")&& PrintStaus.Contains(\"" + printStaus + "\")&& ConfirmStatus.Contains(\"" + confirmStatus + "\")&& PrintDate>=(\""
-            //  + beginDate + "\")&& PrintDate<=(\"" + endDate + "\")");
-
+            //query += " && FeedBillNum.Contains(\"" + feedBillNum + "\")&&WMS_Part.PartCode.Contains(\"" + assemblyPartCode + "\")";
+            query += " && FeedBillNum.Contains(\"" + feedBillNum + "\")";
+            query += " && WMS_Part.PartCode.Contains(\"" + subAssemblyPartCode + "\")&& PrintStaus.Contains(\"" + printStaus + "\")&& ConfirmStatus.Contains(\"" + confirmStatus + "\")";
+            
             List<WMS_Feed_ListModel> list = m_BLL.GetListByWhere(ref setNoPagerAscById, query);
             JArray jObjects = new JArray();
                 foreach (var item in list)
@@ -404,24 +404,27 @@ namespace Apps.Web.Areas.WMS.Controllers
                     var jo = new JObject();
                     //jo.Add("Id", item.Id);
                     jo.Add("投料单号（业务）", item.FeedBillNum);
-                    jo.Add("投料单号（系统）", item.ReleaseBillNum);
-                    jo.Add("投料部门", item.Department);
-                    jo.Add("总成物料", item.AssemblyPartId);
-                    jo.Add("投料物料", item.SubAssemblyPartId);                
+                //jo.Add("投料单号（系统）", item.ReleaseBillNum);
+                jo.Add("投料物料", item.SubAssemblyPartCode);
+                jo.Add("投料物料名称", item.SubAssemblyPartName);
                 jo.Add("投料数量", item.FeedQty);
-                    jo.Add("箱数", item.BoxQty);
-                    jo.Add("体积", item.Capacity);
-                    jo.Add("库房", item.InvId);
+                jo.Add("箱数", item.BoxQty);
+                jo.Add("体积", item.Capacity);
                 jo.Add("批次号", item.Lot);
-                //jo.Add("子库存", item.SubInvId);
-                    jo.Add("备注", item.Remark);
-                    jo.Add("打印状态", item.PrintStaus);
-                    jo.Add("打印时间", item.PrintDate);
-                    jo.Add("打印人", item.PrintMan);
-                    jo.Add("确认状态", item.ConfirmStatus);
-                    jo.Add("确认人", item.ConfirmMan);
-                    jo.Add("确认时间", item.ConfirmDate);
+                jo.Add("备注", item.Remark);
+                jo.Add("打印状态", item.PrintStaus);
+                jo.Add("打印时间", item.PrintDate);
+                //jo.Add("打印人", item.PrintMan);
+                jo.Add("确认状态", item.ConfirmStatus);
+                //jo.Add("确认人", item.ConfirmMan);
+                jo.Add("确认时间", item.ConfirmDate);
                 jo.Add("确认信息", item.ConfirmMessage);
+
+                //jo.Add("投料部门", item.Department);
+                //jo.Add("总成物料", item.AssemblyPartId);
+                //jo.Add("库房", item.InvId);
+                
+                    
                     //jo.Add("Attr1", item.Attr1);
                     //jo.Add("Attr2", item.Attr2);
                     //jo.Add("Attr3", item.Attr3);
@@ -499,9 +502,10 @@ namespace Apps.Web.Areas.WMS.Controllers
         /// <param name="mulSelect">是否多选</param>
         /// <returns></returns>
         [SupportFilter(ActionName = "Create")]
-        public ActionResult FeedListLookUp(string type, bool mulSelect = false)
+        public ActionResult FeedListLookUp(string type, string singleSelect = "true")
         {
             ViewBag.Type = type;
+            ViewBag.singleSelect = singleSelect;
             return View();
         }
 
@@ -538,7 +542,7 @@ namespace Apps.Web.Areas.WMS.Controllers
             }
             else
             {
-                list = m_BLL.GetListByWhere(ref pager, "ReleaseBillNum = \"" + billNum + "\"&& PrintStaus == \"已打印\"");
+                list = m_BLL.GetListForConfirm(ref pager, billNum);
             }
             GridRows<WMS_Feed_ListModel> grs = new GridRows<WMS_Feed_ListModel>();
             grs.rows = list;

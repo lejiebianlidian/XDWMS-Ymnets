@@ -12,6 +12,8 @@ using System.Linq.Expressions;
 using Apps.IDAL.Sys;
 using Unity.Attributes;
 
+
+
 namespace Apps.BLL.WMS
 {
     public  partial class WMS_PartBLL
@@ -21,6 +23,8 @@ namespace Apps.BLL.WMS
 
         [Dependency]
         public IDAL.WMS.IWMS_PartRepository m_PartRep { get; set; }
+
+
 
         public override List<WMS_PartModel> CreateModelList(ref IQueryable<WMS_Part> queryData)
         {
@@ -218,6 +222,22 @@ namespace Apps.BLL.WMS
 
             return rtn;
         }
+
+        public virtual bool UpdateStoreMan(ref ValidationErrors errors, string opt, string o_StoreMan, string n_StoreMan)
+        {
+            try
+            {
+                m_Rep.UpdateStoreMan(opt, o_StoreMan, n_StoreMan);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errors.Add(ex.InnerException != null ? ex.InnerException.Message : ex.Message);
+                return false;
+            }
+
+        }
+
         public bool ImportSafeStock(string oper, string filePath, ref ValidationErrors errors)
         {
             bool rtn = true;
@@ -553,6 +573,124 @@ namespace Apps.BLL.WMS
 
             var targetFile = new FileInfo(filePath);
 
+            List<WMS_Part> ts = null;
+
+            if (!targetFile.Exists)
+            {
+                errors.Add("导入的数据文件不存在");
+                return false;
+            }
+
+            var excelFile = new ExcelQueryFactory(filePath);
+
+            using (XLWorkbook wb = new XLWorkbook(filePath))
+            {
+                //第一个Sheet
+                using (IXLWorksheet wws = wb.Worksheets.First())
+                {
+                    //对应列头
+                    excelFile.AddMapping<WMS_PartModel>(x => x.CustomerCode, "主机厂编码(必输)");
+                    excelFile.AddMapping<WMS_PartModel>(x => x.Volume, "每箱体积(必输)");
+
+
+                    //SheetName，第一个Sheet
+                    var excelContent = excelFile.Worksheet<WMS_PartModel>(0);
+
+                    //开启事务
+                    using (DBContainer db = new DBContainer())
+                    {
+                        var tran = db.Database.BeginTransaction();  //开启事务
+                        int rowIndex = 0;
+
+                        //检查数据正确性
+                        foreach (var row in excelContent)
+                        {
+                            rowIndex += 1;
+                            string errorMessage = String.Empty;
+                            var model = new WMS_PartModel();
+                            model.Id = row.Id;                            
+                            //if (row.PartCode != null)
+                            //    model.PartCode = row.PartCode.Replace(" ", "");
+                            if (row.CustomerCode != null)
+                                model.CustomerCode = ";"+row.CustomerCode.Replace(" ", "")+";";
+                            model.Volume = row.Volume;
+
+
+                            if (!String.IsNullOrEmpty(errorMessage))
+                            {
+                                rtn = false;
+                                errors.Add(string.Format("第 {0} 列发现错误：{1}{2}", rowIndex, errorMessage, "<br/>"));
+                                wws.Cell(rowIndex + 1, excelFile.GetColumnNames("Sheet1").Count()).Value = errorMessage;
+                                continue;
+                            }
+
+                            //执行额外的数据校验
+                            try
+                            {
+                                AdditionalCheckVolume(db, ref model,ref ts);
+                            }
+                            catch (Exception ex)
+                            {
+                                rtn = false;
+                                errorMessage = ex.Message;
+                                errors.Add(string.Format("第 {0} 列发现错误：{1}{2}", rowIndex, errorMessage, "<br/>"));
+                                wws.Cell(rowIndex + 1, excelFile.GetColumnNames("Sheet1").Count()).Value = errorMessage;
+                                continue;
+                            }
+
+                            //写入数据库  
+                            if (ts != null)
+                            {
+                                foreach (var ls in ts)
+                                {
+                                    WMS_Part entity = db.WMS_Part.FirstOrDefault(p =>p.Id == ls.Id);
+                                    //entity.Id = model.Id;
+                                    //entity.PartCode = model.PartCode;
+                                    entity.Volume = model.Volume;
+                                    entity.ModifyPerson = oper;
+                                    entity.ModifyTime = DateTime.Now;
+                                    //m_Rep.Edit(entity);
+
+                                    //db.WMS_Part.Add(entity);
+                                    try
+                                    {
+                                        db.SaveChanges();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        rtn = false;
+                                        //将当前报错的entity状态改为分离，类似EF的回滚（忽略之前的Add操作）
+                                        db.Entry(entity).State = System.Data.Entity.EntityState.Detached;
+                                        errorMessage = ex.InnerException.InnerException.Message;
+                                        errors.Add(string.Format("第 {0} 列发现错误：{1}{2}", rowIndex, errorMessage, "<br/>"));
+                                        wws.Cell(rowIndex + 1, excelFile.GetColumnNames("Sheet1").Count()).Value = errorMessage;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (rtn)
+                        {
+                            tran.Commit();  //必须调用Commit()，不然数据不会保存
+                        }
+                        else
+                        {
+                            tran.Rollback();    //出错就回滚       
+                        }
+                    }
+                }
+                wb.Save();
+            }
+
+            return rtn;
+        }
+
+        public bool ImportStoreMan(string oper, string filePath, ref ValidationErrors errors)
+        {
+            bool rtn = true;
+
+            var targetFile = new FileInfo(filePath);
+
             if (!targetFile.Exists)
             {
                 errors.Add("导入的数据文件不存在");
@@ -568,7 +706,7 @@ namespace Apps.BLL.WMS
                 {
                     //对应列头
                     excelFile.AddMapping<WMS_PartModel>(x => x.PartCode, "物料编码(必输)");
-                    excelFile.AddMapping<WMS_PartModel>(x => x.Volume, "每箱体积(必输)");
+                    excelFile.AddMapping<WMS_PartModel>(x => x.StoreMan, "保管员(必输)");
 
 
                     //SheetName，第一个Sheet
@@ -589,7 +727,8 @@ namespace Apps.BLL.WMS
                             model.Id = row.Id;
                             if (row.PartCode != null)
                                 model.PartCode = row.PartCode.Replace(" ", "");
-                            model.Volume = row.Volume;
+                            if (row.StoreMan != null)
+                                model.StoreMan = row.StoreMan.Replace(" ", "");
 
 
                             if (!String.IsNullOrEmpty(errorMessage))
@@ -603,7 +742,7 @@ namespace Apps.BLL.WMS
                             //执行额外的数据校验
                             try
                             {
-                                AdditionalCheckVolume(db, ref model);
+                                AdditionalCheckStoreMan(db, ref model);
                             }
                             catch (Exception ex)
                             {
@@ -618,7 +757,7 @@ namespace Apps.BLL.WMS
                             WMS_Part entity = m_Rep.GetById(model.Id);
                             entity.Id = model.Id;
                             //entity.PartCode = model.PartCode;
-                            entity.Volume = model.Volume;
+                            entity.StoreMan =  model.StoreMan;
                             entity.ModifyPerson = oper;
                             entity.ModifyTime = DateTime.Now;
                             m_Rep.Edit(entity);
@@ -655,6 +794,7 @@ namespace Apps.BLL.WMS
             return rtn;
         }
 
+        
 
         public void AdditionalCheckExcelData(DBContainer db, ref WMS_PartModel model)
         {
@@ -795,7 +935,57 @@ namespace Apps.BLL.WMS
 
         }
 
-        public void AdditionalCheckVolume(DBContainer db, ref WMS_PartModel model)
+        public void AdditionalCheckVolume(DBContainer db, ref WMS_PartModel model, ref List<WMS_Part> ts)
+        {
+            ////验证物料编码
+            //if (!String.IsNullOrEmpty(model.PartCode))
+            //{
+            //    var partCode = model.PartCode;
+            //    Expression<Func<WMS_Part, bool>> exp = x => x.PartCode == partCode;
+
+            //    //var part = m_PartRep.GetSingleWhere(exp);
+            //    var part = db.WMS_Part.FirstOrDefault(exp);
+            //    if (part == null)
+            //    {
+            //        throw new Exception("物料编码不存在！");
+            //    }
+            //    else { model.Id = part.Id; }
+
+            //}
+            //else
+            //{
+            //    throw new Exception("物料编码不能为空！");
+            //}
+
+            //验证主机厂编码
+            if (!String.IsNullOrEmpty(model.CustomerCode))
+            {
+                var customerCode = model.CustomerCode;
+                List<WMS_Part> list = db.WMS_Part.Where(p => p.CustomerCode.Contains(customerCode)).ToList();
+                
+                //var part = m_PartRep.GetSingleWhere(exp);
+                //var part = db.WMS_Part.FirstOrDefault(exp);
+                if (list.Count() == 0)
+                {
+                    throw new Exception("主机厂编码不存在！");
+                }
+                else { ts = list; }
+            }
+            else
+            {
+                throw new Exception("主机厂编码不能为空！");
+            }
+
+            //安全库存不能为空
+            if (model.Volume==0)
+            {
+                throw new Exception("每箱体积不能为空！");
+            }
+            
+
+        }
+
+        public void AdditionalCheckStoreMan(DBContainer db, ref WMS_PartModel model)
         {
             //验证物料编码
             if (!String.IsNullOrEmpty(model.PartCode))
@@ -817,13 +1007,14 @@ namespace Apps.BLL.WMS
                 throw new Exception("物料编码不能为空！");
             }
             //安全库存不能为空
-            if (model.Volume==0)
+            if (String.IsNullOrEmpty(model.StoreMan))
             {
-                throw new Exception("每箱体积不能为空！");
+                throw new Exception("保管员不能为空！");
             }
 
 
         }
+
 
         public List<WMS_PartModel> GetList(ref GridPager pager, string partCode, string partName)
         {
