@@ -52,6 +52,16 @@ namespace Apps.Web.Areas.WMS.Controllers
         [SupportFilter(ActionName="Index")]
         public JsonResult GetList(GridPager pager, string feedBillNum, string assemblyPartCode, string subAssemblyPartCode, string printStaus, string confirmStatus, DateTime beginDate, DateTime endDate)
         {
+            if (!String.IsNullOrEmpty(feedBillNum))
+            {
+                feedBillNum = feedBillNum.Trim();
+            }
+
+            if (!String.IsNullOrEmpty(subAssemblyPartCode))
+            {
+                subAssemblyPartCode = subAssemblyPartCode.Trim();
+            }
+
             //List<WMS_Feed_ListModel> list = m_BLL.GetList(ref pager, queryStr);
             string query = " 1=1 ";
             query += " && CreateTime>=(\"" + beginDate + "\")&& CreateTime<=(\"" + endDate + "\")";
@@ -294,6 +304,7 @@ namespace Apps.Web.Areas.WMS.Controllers
         #endregion
 
         #region 删除
+        /*
         [HttpPost]
         [SupportFilter]
         public ActionResult Delete(long id)
@@ -350,6 +361,24 @@ namespace Apps.Web.Areas.WMS.Controllers
                 }
             }
                
+        }
+        */
+
+        [HttpPost]
+        [SupportFilter]
+        public ActionResult Delete(string feedBillNum)
+        {
+            if (m_BLL.DeleteFeedList(ref errors, GetUserTrueName(), feedBillNum))
+            {
+                LogHandler.WriteServiceLog(GetUserTrueName(), "feedBillNum:" + feedBillNum, "成功", "删除", "WMS_FeedList");
+                return Json(JsonHandler.CreateMessage(1, Resource.DeleteSucceed));
+            }
+            else
+            {
+                string ErrorCol = errors.Error;
+                LogHandler.WriteServiceLog(GetUserTrueName(), "feedBillNum" + feedBillNum + "," + ErrorCol, "失败", "删除", "WMS_FeedList");
+                return Json(JsonHandler.CreateMessage(0, Resource.DeleteFail + ErrorCol));
+            }
         }
         #endregion
 
@@ -522,7 +551,15 @@ namespace Apps.Web.Areas.WMS.Controllers
             }
             else
             {
-                list = m_BLL.GetListByWhereAndGroupBy(ref pager, "PrintStaus == \"已打印\" and ConfirmStatus == \"未确认\"");
+                if (String.IsNullOrEmpty(queryStr))
+                {
+                    list = m_BLL.GetListByWhereAndGroupBy(ref pager, "PrintStaus == \"已打印\" && ConfirmStatus == \"未确认\"");
+
+                }
+                else
+                {
+                    list = m_BLL.GetListByWhereAndGroupBy(ref pager, "FeedBillNum = \"" + queryStr + "\" && PrintStaus == \"已打印\" && ConfirmStatus == \"未确认\"");
+                }
             }
             GridRows<WMS_Feed_ListModel> grs = new GridRows<WMS_Feed_ListModel>();
             grs.rows = list;

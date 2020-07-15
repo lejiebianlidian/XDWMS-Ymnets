@@ -4,7 +4,7 @@
 @using Apps.Models.Sys;
 @using Apps.Locale;
 @{
-    ViewBag.Title = "WMS_Feed_List";
+    ViewBag.Title = "投料单";
     Layout = "~/Views/Shared/_Index_Layout.cshtml";
     List<permModel> perm = null;
 }
@@ -78,6 +78,11 @@
             striped: true, //奇偶行是否区分
             singleSelect: true,//单选模式
             //rownumbers: true,//行号
+            rowStyler: function (index, row) {
+                if (Number(row.FeedQty) > Number(row.InvQty)) {
+                    return 'background: #D24D57; color: #fff';
+                }
+            },
             showFooter: true,
             onLoadSuccess: function(data) {                @foreach(var r in perm){ if (r.Category == 2) { @Html.Raw("$(this).datagrid('hideColumn','" + r.KeyCode + "'); "); } }
             },
@@ -94,6 +99,7 @@
                 { field: 'SubAssemblyPartName', title: '投料物料名称', width: 120, sortable: true },
                 //{ field: 'Lot', title: '批次号', width: 50, sortable: true },
                 { field: 'FeedQty', title: '投料数量', width: 80, sortable: true, align: 'right' },
+                { field: 'InvQty', title: '库存数', width: 80, sortable: true, align: 'right' },
                 { field: 'BoxQty', title: '箱数', width: 50, sortable: true, align: 'right' },
                 { field: 'Capacity', title: '体积', width: 50,sortable:true },
                 //{ field: 'InvName', title: '库房', width: 80,sortable:true },
